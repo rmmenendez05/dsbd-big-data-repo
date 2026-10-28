@@ -45,29 +45,27 @@ sources:
       unit: persons
       time: "2023"
 
-  # --- Fuentes 4 y 5 (descomentad una/ambas solo si sustituís a otras;
-  #     en la entrega deben quedar exactamente TRES activas) ---
-  # - id: owid_life_expectancy
-  #   name: Our World in Data — life expectancy (CSV)
-  #   url: >-
-  #     https://ourworldindata.org/grapher/life-expectancy.csv?v=1&csvType=full&useColumnShortNames=false
-  #   format: csv
-  #   role: indicator
-  #   transformer: owid_life_expectancy
-  #   meta:
-  #     indicator_id: life_expectancy
-  #     indicator_label: Life expectancy
-  #     unit: years
-  #     year: "2023"
+  - id: owid_life_expectancy
+    name: Our World in Data — life expectancy (CSV)
+    url: >-
+      https://ourworldindata.org/grapher/life-expectancy.csv?v=1&csvType=full&useColumnShortNames=false
+    format: csv
+    role: indicator
+    transformer: owid_life_expectancy
+    meta:
+      indicator_id: life_expectancy
+      indicator_label: Life expectancy
+      unit: years
+      year: "2023"
 
-  # - id: worldbank_pop
-  #   name: World Bank — población total (SP.POP.TOTL)
-  #   url_template: >-
-  #     https://api.worldbank.org/v2/country/{iso2}/indicator/SP.POP.TOTL?format=json&mrnev=1
-  #   format: json
-  #   role: indicator
-  #   transformer: worldbank_indicator
-  #   meta:
-  #     indicator_id: SP.POP.TOTL
-  #     indicator_label: Population, total
-  #     unit: persons
+  - id: worldbank_pop
+    name: World Bank — población total (SP.POP.TOTL)
+    url_template: >-
+      https://api.worldbank.org/v2/country/{iso2}/indicator/SP.POP.TOTL?format=json&mrnev=1
+    format: json
+    role: indicator
+    transformer: worldbank_indicator
+    meta:
+      indicator_id: SP.POP.TOTL
+      indicator_label: Population, total
+      unit: persons
