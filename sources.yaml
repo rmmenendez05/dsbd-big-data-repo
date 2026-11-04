@@ -69,3 +69,6 @@ sources:
       indicator_id: SP.POP.TOTL
       indicator_label: Population, total
       unit: persons
+
+universe:
+  criterion: independent  # all | incependent | one_member
