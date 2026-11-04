@@ -5,6 +5,7 @@ Uso (desde practica_01_starter/):
     python -m src.pipeline
     python -m src.pipeline --skip-extract   # reusa data/raw/
     python -m src.pipeline --parquet
+    python -m src.pipeline --focus-countries  # solo focus_countries (por defecto: todos los países)
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from __future__ import annotations
 import argparse
 
 from .build_cards import run_build_cards
-from .extract import run_extract
+from .extract_module.extract import run_extract
 from .load import run_load
 from .transform import run_transform
 
@@ -29,10 +30,14 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Además del SQLite, escribir Parquet en data/serving/",
     )
+    # Por defecto se cargan todos los países; este flag limita a focus_countries
+    parser.add_argument("--focus-countries", action="store_true",
+                    help="Usar solo focus_countries en vez de todos los países")
+
     args = parser.parse_args(argv)
 
     if not args.skip_extract:
-        run_extract()
+        run_extract(all_countries=not args.focus_countries)
     else:
         print("[pipeline] extract omitido (--skip-extract)")
 

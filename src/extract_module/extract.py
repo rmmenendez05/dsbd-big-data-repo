@@ -11,9 +11,10 @@ from pathlib import Path
 
 import requests
 
-from .core.config import Config, Source, load_config
-from .core.constants import TIMEOUT, USER_AGENT
-from .core.paths import MANIFEST, RAW, ensure_dirs
+from ..core.config import Config, FocusCountry, Source, load_config
+from ..core.constants import TIMEOUT, USER_AGENT
+from ..core.paths import MANIFEST, RAW, ensure_dirs
+from .countries import get_all_countries
 
 
 def _raw_name(source: Source, iso2: str | None = None) -> str:
@@ -32,25 +33,25 @@ def _download(url: str, dest: Path) -> tuple[int, int]:
     return resp.status_code, len(resp.content)
 
 
-def extract_source(source: Source, cfg: Config) -> list[dict]:
-    """Descarga una fuente; si tiene plantilla, una petición por país foco."""
+def extract_source(source: Source, countries: list[FocusCountry]) -> list[dict]:
+    """Descarga una fuente; si tiene plantilla, una petición por país objetivo."""
     rows: list[dict] = []
     now = datetime.now(timezone.utc).isoformat()
 
-    if source.url_template:
-        targets = cfg.focus_countries
-    else:
-        targets = [None]
+    targets = countries if source.url_template else [None]
 
+    ctr_count = 0
     for country in targets:
         iso2 = country.iso2 if country else ""
         iso3 = country.iso3 if country else ""
         url = source.resolve_url(iso2=iso2, iso3=iso3)
         filename = _raw_name(source, iso2 or None)
         dest = RAW / filename
+        print(f"  {iso2 or '-'}: {url}")
         try:
             status, nbytes = _download(url, dest)
             note = ""
+            ctr_count+=1
         except requests.RequestException as exc:
             status, nbytes = 0, 0
             note = str(exc)
@@ -67,16 +68,19 @@ def extract_source(source: Source, cfg: Config) -> list[dict]:
                 "note": note,
             }
         )
+    print("TOTAL COUNTRIES:", ctr_count)
     return rows
 
 
-def run_extract(cfg: Config | None = None) -> Path:
+def run_extract(cfg: Config | None = None, all_countries: bool = True) -> Path:
     cfg = cfg or load_config()
     ensure_dirs()
+    countries = get_all_countries(cfg) if all_countries else cfg.focus_countries
+    print(f"[extract] {len(countries)} países objetivo")
     all_rows: list[dict] = []
     for source in cfg.sources:
         print(f"[extract] {source.id} — {source.name}")
-        all_rows.extend(extract_source(source, cfg))
+        all_rows.extend(extract_source(source, countries))
 
     fieldnames = [
         "timestamp_utc",

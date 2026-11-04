@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from .core.constants import DB_PATH
-from .core.paths import CARDS, ensure_dirs
+from .core.paths import CARDS, SERVING, ensure_dirs
+
+DB_PATH = SERVING / "observatorio.sqlite"
 
 
 def _read_table(conn: sqlite3.Connection, name: str) -> pd.DataFrame:

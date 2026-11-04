@@ -7,8 +7,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from .core.constants import DB_PATH, TABLES
 from .core.paths import CLEAN, SERVING, ensure_dirs
+
+DB_PATH = SERVING / "observatorio.sqlite"
+TABLES = ("countries", "languages", "indicators", "join_orphans")
 
 
 def run_load(write_parquet: bool = False) -> Path:
