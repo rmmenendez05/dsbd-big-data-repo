@@ -1,5 +1,5 @@
 import requests
-from .config import load_config
+from ..core.config import load_config
 
 
 def get_data(cnf: load_config) -> list:

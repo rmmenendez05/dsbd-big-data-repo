@@ -11,11 +11,9 @@ from pathlib import Path
 
 import requests
 
-from .config import Config, Source, load_config
-from .paths import MANIFEST, RAW, ensure_dirs
-
-USER_AGENT = "UCJC-DSBD-practica1/1.2 (educational ETL framework)"
-TIMEOUT = 60
+from .core.config import Config, Source, load_config
+from .core.constants import TIMEOUT, USER_AGENT
+from .core.paths import MANIFEST, RAW, ensure_dirs
 
 
 def _raw_name(source: Source, iso2: str | None = None) -> str:

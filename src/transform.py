@@ -19,8 +19,8 @@ from typing import Callable
 
 import pandas as pd
 
-from .config import Config, Source, load_config
-from .paths import CLEAN, RAW, ensure_dirs
+from .core.config import Config, Source, load_config
+from .core.paths import CLEAN, RAW, ensure_dirs
 
 Transformer = Callable[[Source, Config], dict[str, pd.DataFrame]]
 
