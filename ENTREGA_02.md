@@ -44,9 +44,46 @@ y de OWID (`World`, continentes sin código ISO3).
 
 ## 2. Resultado y diferencia con la predicción
 
-_Pendiente: cifras reales tras `python -m src.pipeline` (total de la API por
-indicador, filas en clean por indicador, número de países aceptados y
-excluidos) y explicación de cada diferencia con la predicción._
+Primera ejecución completa el 11/11/2026 (`run_id` `20261111T090002Z-88b77a00`),
+en Docker (`compose.yaml`), después del commit de la predicción.
+
+**A. Bruto.** Los seis indicadores declaran `total=17556` y se guardaron
+17 556 registros de cada uno en 2 páginas: **acierto exacto** (105 336 en
+total). Eurostat respondió HTTP 200 con una página HTML de «Server temporarily
+unavailable» en todas las ejecuciones del día. El extract lo reintenta y no lo
+guarda (véase BUGS.md, defecto 7), así que esta entrega sale sin Eurostat.
+
+**B. Limpio.** 194 países aceptados (predicción: unos 195) y 193 con datos
+del Banco Mundial; el que falta es la Ciudad del Vaticano (`VAT`), que el
+Banco Mundial no publica.
+
+| Indicador | Filas en clean (pred.) | Con valor (pred.) |
+| --- | --- | --- |
+| NY.GDP.PCAP.CD | 12 738 (≈ 12 700) | 10 962 (≈ 10 000) |
+| SP.POP.TOTL | 12 738 (≈ 12 700) | 12 738 (≈ 12 600) |
+| SP.DYN.LE00.IN | 12 738 (≈ 12 700) | 12 541 (≈ 12 200) |
+| SP.URB.TOTL.IN.ZS | 12 738 (≈ 12 700) | 12 738 (≈ 12 600) |
+| SP.DYN.TFRT.IN | 12 738 (≈ 12 700) | 12 543 (≈ 12 200) |
+| SL.UEM.TOTL.ZS | 12 738 (≈ 12 700) | 6 219 (≈ 6 300) |
+| life_expectancy (OWID) | 16 344 | 16 344 |
+
+Banco Mundial: **76 428 filas** (predicción ≈ 76 000), 67 741 con valor
+(predicción ≈ 65 000). Total en `data/clean/indicators`: **92 772 filas**,
+84 085 con valor. 193 × 66 años = 12 738 explica exactamente las filas por
+indicador.
+
+**Diferencias con la predicción.**
+
+- *Excluidos del Banco Mundial:* 73 por indicador, no los 49 previstos. Mi
+  predicción solo contaba los agregados, pero el criterio `independent`
+  también deja fuera entidades no agregadas que no son estados, como
+  `PRI` (Puerto Rico) y `HKG` (Hong Kong): 266 − 193 = 73.
+- *Excluidos del perfil:* 56 (predicción: unos 55). Con OWID, 548 en total.
+- *Valores no nulos:* los subestimé. Población y población urbana no tienen
+  ni un nulo en 1960–2025; PIB per cápita tiene más datos antiguos de los que
+  esperaba.
+- *Huérfanos:* 216. 194 son de Eurostat (fuente caída); de los demás, 16 son
+  de desempleo (microestados sin estimación de la OIT) y 2 de PIB.
 
 ## 3. Decisiones
 
@@ -72,7 +109,8 @@ no en el código: Eurostat usa `EL` para Grecia y `UK` para Reino Unido
 - `SL.UEM.TOTL.ZS` (desempleo): indicador del mercado laboral; su serie empieza en 1991 y obliga a tratar bien los nulos.
 
 **Particionado.** `data/clean/indicators/` se particiona por
-`indicator_id` (6 + 2 carpetas). Es la columna del filtro habitual («este
+`indicator_id`: una carpeta por indicador (7 en esta ejecución, 8 cuando
+Eurostat responde). Es la columna del filtro habitual («este
 indicador») y tiene pocos valores distintos. Particionar por `iso3` daría unas
 190 carpetas diminutas y obligaría a abrir casi todas para leer un indicador.
 
@@ -83,23 +121,82 @@ por defecto (`--force` para repetir) y manifiesto acumulativo con `run_id`.
 
 ## 4. Evidencia
 
-_Pendiente: salidas de terminal de la primera y la segunda ejecución del
-pipeline (la segunda sin re-descargas), salida de `python spark/job_01.py` con
-`exit=0` y nombre del subdirectorio del event log copiado en `evidencias/`._
+Event log del job: `evidencias/eventlog_v2_local-1794387660065/` (copia
+entera del subdirectorio de `logs/spark-events/`).
+
+Segunda ejecución del pipeline (`run_id` `20261111T090030Z-973712bf`): no
+descarga nada que ya estuviera bien; solo reintenta Eurostat, que no tiene
+ningún fichero válido en `raw/`. El manifiesto acumula las filas de ambas.
+
+```text
+[extract] run_id=20261111T090030Z-973712bf force=False
+[extract] worldbank_gdp — World Bank — PIB per cápita (NY.GDP.PCAP.CD)
+  ya descargado (2 páginas), se omite
+  …(igual en los seis indicadores, el perfil y OWID)
+[extract] eurostat_pop — Eurostat — población a 1 de enero (demo_pjan)
+    reintento 3/3 en 2.0s (HTTP 200 con cuerpo que no es json)
+[transform] countries: 194 filas
+[transform] excluded_entities: 548 filas
+[transform] indicators: 92772 filas
+[transform] huérfanos del join: 216
+[pipeline] listo.
+```
+
+`python spark/job_01.py`:
+
+```text
+[job_01] particiones del DataFrame leído: 7
+[job_01] cobertura_decada → data/serving/spark/cobertura_decada
+[job_01] dataframe: 88 grupos (indicator_id, década)
+[job_01] rdd: 88 grupos (indicator_id, década)
+[job_01] spark_sql: 88 grupos (indicator_id, década)
+[job_01] sqlite: 88 grupos (indicator_id, década)
+[job_01] RDD, DataFrame, Spark SQL y SQLite coinciden.
+exit=0
+```
+
+Ejemplo de la cobertura (PIB per cápita): 120 países con dato en los 60,
+190 en los 90 y 192 en los 2000. La década de 2020 tiene 1 118 filas porque
+2025 aún está casi vacío.
 
 ## 5. Preguntas de teoría (con nuestros datos)
 
 1. **Event log: ¿qué registra Spark antes de la primera acción del job?**
-   _Pendiente: lo que se ve en el event log de `evidencias/` antes del primer
-   job._
-2. **Particiones y shuffle: ¿cuántas particiones tiene el DataFrame leído y
-   dónde está el shuffle en el plan físico?** _Pendiente:
-   `getNumPartitions()` con `local[1]` y `local[*]`, y el operador `Exchange`
-   del plan físico de la versión DataFrame._
-3. **CSV frente a Parquet: ¿cuánto ocupa `indicators` en cada formato?**
-   _Pendiente: tamaño de `data/clean/indicators.csv` frente al dataset
-   Parquet `data/clean/indicators/`._
+   Antes del primer `JobStart` hay seis eventos de arranque: `LogStart`,
+   `ResourceProfileAdded`, `ExecutorAdded`, `BlockManagerAdded`,
+   `EnvironmentUpdate` (con `spark.master=local[*]`) y `ApplicationStart`.
+   Después, el log registra 16 jobs y 17 stages (229 eventos). El **job 0**
+   (1 tarea, sin ejecución SQL asociada) aparece antes de nuestra primera
+   acción: lo lanza `spark.read.parquet` para leer el esquema de los
+   ficheros, así que la lectura no es del todo «perezosa». La primera acción
+   del job (la escritura de `cobertura_decada`, ejecución SQL 0) empieza en
+   el job 1.
+2. **Particiones y shuffle.** El DataFrame leído tiene **7 particiones** con
+   `local[*]` (12 núcleos): una por fichero, porque cada carpeta
+   `indicator_id=…` tiene un solo Parquet de unos 100 KB, muy por debajo de
+   `maxPartitionBytes` (128 MB). Lo comprobamos con nuestros datos: con
+   `local[1]` sale 1 partición y con `local[4]`, 4. Con ficheros tan
+   pequeños, Spark agrupa ficheros por núcleo y el número de particiones al
+   leer sí depende del paralelismo; con ficheros grandes dependería sobre todo
+   de `maxPartitionBytes`. En el plan físico de la versión DataFrame hay
+   **dos `Exchange`** (shuffle, `hashpartitioning(..., 200)`). El primero
+   reparte por `(indicator_id, decada, iso3)` y el segundo por
+   `(indicator_id, decada)`: `countDistinct(iso3)` obliga a agregar en dos
+   niveles. `AdaptiveSparkPlan` (AQE) agrupa después esas 200 particiones de
+   shuffle.
+3. **CSV frente a Parquet.** `data/clean/indicators.csv` ocupa
+   **9 306 861 bytes (8,9 MB)**; el dataset Parquet `data/clean/indicators/`
+   ocupa **681 719 bytes (0,68 MB)**: unas **13,7 veces menos**. Influyen la
+   compresión por columnas, que `year` y `value` son binarios y no texto, y
+   que `indicator_id` no se repite en cada fila: está en el nombre de la
+   carpeta Hive.
 
 ## 6. Pendientes
 
-_Pendiente: lo que quede sin resolver tras la entrega._
+- Eurostat estuvo caído todo el día (HTTP 200 con HTML). El código ya lo
+  trata bien; falta una ejecución con Eurostat disponible para tener su
+  población (`demo_pjan`) en clean y comprobar los alias `EL`/`UK`.
+- Kosovo: los alias `XKX`/`OWID_KOS` → `UNK` están declarados, pero con el
+  criterio `independent` Kosovo queda fuera; habría que decidir si se acepta.
+- Las fichas usan el último año con dato de la región. Podría añadirse una
+  comparación con una serie de varios años.

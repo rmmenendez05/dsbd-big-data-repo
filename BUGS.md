@@ -1,7 +1,7 @@
 # BUGS
 
 Defectos encontrados en el ETL de la Práctica 1 (tag `v1.0.0`) y corregidos
-en el Hito 1 (tag `hito-1`). Para cada uno: cómo se reproduce, qué efecto
+en el Hito 1 (tag `hito-1`). El 7 apareció al ejecutar el universo completo en el Hito 2. Para cada uno: cómo se reproduce, qué efecto
 tenía en los datos o en las fichas y cómo se arregló.
 
 ## 1. El extract guardaba en `data/raw/` respuestas de error
@@ -73,3 +73,25 @@ tenía en los datos o en las fichas y cómo se arregló.
   una fuente concreta pasaban inadvertidas.
 - **Arreglo:** `join_orphans.csv` tiene una fila por
   (`iso3`, `source_id`, `indicator_id`) sin ningún valor.
+
+## 7. Un HTTP 200 con una página HTML de error se guardaba como dato
+
+Encontrado en la primera ejecución completa del Hito 2 (11/11/2026).
+
+- **Reproducción:** `python -m src.pipeline` con Eurostat caído. La API
+  responde **HTTP 200** con una página HTML («Server temporarily
+  unavailable») en vez de JSON. Ver las primeras líneas de
+  `data/raw/eurostat_pop.json`: empezaba por `<!DOCTYPE html>`.
+- **Efecto:** el extract solo miraba el código HTTP y guardó el HTML como si
+  fuera el JSON de Eurostat. El transform se cayó con
+  `JSONDecodeError: Expecting value: line 1 column 1` y no se generó nada en
+  `clean/`, así que el job de Spark tampoco tenía Parquet que leer. En la
+  segunda ejecución la idempotencia veía el fichero como inválido, lo volvía
+  a pedir y recibía el mismo HTML.
+- **Arreglo:** `_body_ok` comprueba que el cuerpo de un 200 se pueda leer en
+  el formato declarado (`format: json` o `csv`; rechaza HTML). Si no, se
+  trata como error transitorio: reintentos con espera creciente y, si sigue
+  igual, no se guarda y se anota en el manifiesto. `_drop_invalid` borra el
+  fichero inválido que hubiera quedado en `raw/` de otra ejecución. Con
+  Eurostat caído, el pipeline termina con `exit=0` y sus países aparecen como
+  huérfanos de esa fuente.
