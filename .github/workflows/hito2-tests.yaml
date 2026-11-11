@@ -1,0 +1,159 @@
+# CI/CD · Hito 2: job de Spark, documentación y cierre de la entrega.
+#
+# tests       (CI) en cada push y pull request: tests/hito2 (job, BUGS.md,
+#             ENTREGA_02.md, evidencias/, .gitignore y etiqueta entrega-02).
+# regenerar   (CD) al subir la etiqueta entrega-02 o v*, o a mano: lo mismo
+#             que se hace con un clon limpio en la corrección:
+#               pip install -r requirements.txt
+#               python -m src.pipeline   (1.ª vez: descarga)
+#               python -m src.pipeline   (2.ª vez: sin re-descargas)
+#               python spark/job_01.py   (exit=0)
+#             y publica una release con la cobertura, el manifiesto, las
+#             fichas y el event log. Sale a las APIs reales, por eso no corre
+#             en cada push.
+name: Hito 2 · tests y regeneración
+
+on:
+  push:
+    branches: [main]
+    tags: ["entrega-02", "v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hito2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: tests/hito2
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # El test de cierre busca la etiqueta entrega-02 en el clon
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Tests del Hito 2
+        run: python -m pytest tests/hito2 -v --tb=short
+
+  regenerar:
+    name: Regenerar desde un clon limpio
+    needs: tests
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write   # para crear la release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Java 17 para Spark
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Instalar dependencias (solo requirements.txt)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Pipeline, 1.ª ejecución
+        run: python -m src.pipeline
+
+      - name: Pipeline, 2.ª ejecución (idempotencia)
+        run: python -m src.pipeline
+
+      - name: Comprobar que la 2.ª ejecución no re-descargó nada válido
+        run: |
+          python - <<'EOF'
+          import csv, sys
+          rows = list(csv.DictReader(open("data/raw/manifest.csv", encoding="utf-8")))
+          runs = list(dict.fromkeys(r["run_id"] for r in rows))
+          if len(runs) < 2:
+              sys.exit(f"El manifiesto tiene {len(runs)} run_id: no es acumulativo")
+          first, second = runs[-2], runs[-1]
+
+          def downloaded(run):
+              # Una descarga real: HTTP 200 con bytes guardados (las omitidas no traen status)
+              return {r["filename"] for r in rows
+                      if r["run_id"] == run and r["http_status"] == "200" and r["bytes"] not in ("", "0")}
+
+          ok_first = downloaded(first)
+          repeated = sorted(downloaded(second) & ok_first)
+          print(f"1.ª ejecución: {len(ok_first)} ficheros descargados")
+          print(f"2.ª ejecución: {len(downloaded(second))} descargas nuevas, {len(repeated)} repetidas")
+          if repeated:
+              sys.exit(f"La 2.ª ejecución volvió a descargar ficheros ya válidos: {repeated}")
+          EOF
+
+      - name: Job de Spark
+        run: python spark/job_01.py
+
+      - name: Resumen
+        run: |
+          {
+            echo "### Regeneración desde un clon limpio"
+            echo
+            echo "| Salida | Valor |"
+            echo "| --- | --- |"
+            echo "| Países aceptados | $(($(wc -l < data/clean/countries.csv) - 1)) |"
+            echo "| Filas en clean/indicators | $(($(wc -l < data/clean/indicators.csv) - 1)) |"
+            echo "| Entidades excluidas | $(($(wc -l < data/clean/excluded_entities.csv) - 1)) |"
+            echo "| Huérfanos | $(($(wc -l < data/clean/join_orphans.csv) - 1)) |"
+            echo "| Fichas | $(ls cards/*.md | wc -l) |"
+            echo "| job_01.py | exit=0 |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Empaquetar resultados
+        run: |
+          mkdir -p dist
+          (cd data/serving/spark && zip -qr "$GITHUB_WORKSPACE/dist/cobertura_decada.zip" cobertura_decada)
+          (cd logs && zip -qr "$GITHUB_WORKSPACE/dist/spark-events.zip" spark-events)
+          zip -qr dist/cards.zip cards -x "cards/.gitkeep"
+          cp data/raw/manifest.csv dist/manifest.csv
+          cp data/clean/excluded_entities.csv data/clean/join_orphans.csv dist/
+
+      - name: Guardar resultados como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-${{ github.ref_name }}
+          path: dist/
+          retention-days: 30
+
+      - name: Publicar release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          notes="Regenerado desde un clon limpio de ${TAG}: pipeline dos veces (sin re-descargas) y spark/job_01.py con exit=0. Ver ENTREGA_02.md."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "$TAG" --notes "$notes"
+          fi

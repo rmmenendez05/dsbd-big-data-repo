@@ -1,1 +1,41 @@
-# Tests para el Hito 1 (CI CD)
+# CI · Hito 1: extract, transform, Parquet y fichas.
+#
+# Ejecuta tests/hito1 en cada push y pull request a main. Los tests no
+# salen a la red: trabajan con datos mínimos en directorios temporales.
+name: Hito 1 · tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hito1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: tests/hito1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependencias (las del clon limpio + pytest)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Tests del Hito 1
+        run: python -m pytest tests/hito1 -v --tb=short
