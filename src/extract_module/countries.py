@@ -1,16 +1,19 @@
-import requests
+from pathlib import Path
 
 from ..core.config import Config, FocusCountry
-from ..core.constants import TIMEOUT, USER_AGENT
+from ..transform_module.universe import build_universe
 
 
-def get_all_countries(cfg: Config) -> list[FocusCountry]:
-    """Descarga mledoze/countries y devuelve todos los países (iso2, iso3)."""
-    source = next(s for s in cfg.sources if s.id == "countries_profile")
-    resp = requests.get(
-        source.resolve_url(),
-        timeout=TIMEOUT,
-        headers={"User-Agent": USER_AGENT},
-    )
-    resp.raise_for_status()
-    return [FocusCountry(iso2=c["cca2"], iso3=c["cca3"]) for c in resp.json()]
+def get_all_countries(cfg: Config, raw_dir: Path) -> list[FocusCountry]:
+    """Países del universo, a partir del perfil ya descargado en raw_dir.
+
+    Sin perfil descargado (o sin fuente de perfil) se usan los focus_countries.
+    """
+    try:
+        universe = build_universe(cfg, raw_dir)
+    except FileNotFoundError:
+        return list(cfg.focus_countries)
+    return [
+        FocusCountry(iso2=r.iso2, iso3=r.iso3)
+        for r in universe.df.itertuples(index=False)
+    ]

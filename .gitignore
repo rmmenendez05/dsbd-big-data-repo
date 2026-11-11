@@ -11,3 +11,4 @@ cards/*
 !cards/.gitkeep
 informe/*
 !informe/.gitkeep
+.github

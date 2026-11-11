@@ -1,10 +1,28 @@
-# Cinco fuentes del enunciado. Para la entrega: dejad exactamente TRES
-# activas (comentad o borrad las otras dos) y documentad la elección.
+# Fuentes del observatorio país (Hito 1).
 #
-# url fija     → data/raw/{id}.{format}
-# url_template → data/raw/{id}_{iso2}.{format}
-#   marcadores: {iso2} {iso3}
+# url fija                → data/raw/{id}.{format}
+# url_template            → data/raw/{id}_{iso2}.{format}   (marcadores {iso2} {iso3})
+# paginate: worldbank     → data/raw/{id}_page001.json, _page002.json, …
+#                           (se piden todas las páginas y se contrasta con `total`)
+#
+# Las fuentes de indicadores piden el universo completo y la serie histórica
+# entera: nada de una URL por país del foco ni de un único año.
 
+# Cortesía con las APIs (lo usa el extract)
+http:
+  user_agent: "UCJC-DSBD-BigData/2.0 (observatorio-pais; equipo dsbd-big-data-repo)"
+  max_requests_per_second: 5   # nunca más de 5 peticiones/segundo
+  max_retries: 3               # 429, 5xx y errores de red; un 404 no se reintenta
+  timeout_seconds: 60
+  backoff_seconds: 0.5         # espera creciente: 0.5 s, 1 s, 2 s…
+
+# Universo de países: qué entidades del perfil cuentan como país.
+#   all | independent | un_member | focus (= solo focus_countries)
+# Lo que no pase el criterio va a data/clean/excluded_entities.csv.
+universe:
+  criterion: independent
+
+# Países de referencia (modo --focus-countries y criterio focus)
 focus_countries:
   - { iso2: ES, iso3: ESP }
   - { iso2: FR, iso3: FRA }
@@ -12,6 +30,8 @@ focus_countries:
   - { iso2: IT, iso3: ITA }
   - { iso2: PT, iso3: PRT }
 
+# aliases: código propio de la fuente → código canónico del universo
+# (iso3 para Banco Mundial y OWID, iso2 para Eurostat).
 sources:
   - id: countries_profile
     name: mledoze/countries (perfil e idiomas)
@@ -20,55 +40,107 @@ sources:
     role: profile
     transformer: countries_profile
 
+  # ---- Banco Mundial (WDI): seis indicadores, universo paginado, serie completa
   - id: worldbank_gdp
     name: World Bank — PIB per cápita (NY.GDP.PCAP.CD)
-    url_template: >-
-      https://api.worldbank.org/v2/country/{iso2}/indicator/NY.GDP.PCAP.CD?format=json&mrnev=1
+    url: https://api.worldbank.org/v2/country/all/indicator/NY.GDP.PCAP.CD?format=json&per_page=10000
+    paginate: worldbank
     format: json
     role: indicator
     transformer: worldbank_indicator
+    aliases: { XKX: UNK }
     meta:
       indicator_id: NY.GDP.PCAP.CD
       indicator_label: GDP per capita (current US$)
       unit: USD
 
-  - id: eurostat_pop
-    name: Eurostat — población (demo_pjan)
-    url_template: >-
-      https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/demo_pjan?format=JSON&lang=en&geo={iso2}&sex=T&age=TOTAL&time=2023
-    format: json
-    role: indicator
-    transformer: eurostat_demo_pjan
-    meta:
-      indicator_id: demo_pjan
-      indicator_label: Population on 1 January
-      unit: persons
-      time: "2023"
-
-  - id: owid_life_expectancy
-    name: Our World in Data — life expectancy (CSV)
-    url: >-
-      https://ourworldindata.org/grapher/life-expectancy.csv?v=1&csvType=full&useColumnShortNames=false
-    format: csv
-    role: indicator
-    transformer: owid_life_expectancy
-    meta:
-      indicator_id: life_expectancy
-      indicator_label: Life expectancy
-      unit: years
-      year: "2023"
-
   - id: worldbank_pop
     name: World Bank — población total (SP.POP.TOTL)
-    url_template: >-
-      https://api.worldbank.org/v2/country/{iso2}/indicator/SP.POP.TOTL?format=json&mrnev=1
+    url: https://api.worldbank.org/v2/country/all/indicator/SP.POP.TOTL?format=json&per_page=10000
+    paginate: worldbank
     format: json
     role: indicator
     transformer: worldbank_indicator
+    aliases: { XKX: UNK }
     meta:
       indicator_id: SP.POP.TOTL
       indicator_label: Population, total
       unit: persons
 
-universe:
-  criterion: independent  # all | incependent | one_member
+  - id: worldbank_life_expectancy
+    name: World Bank — esperanza de vida al nacer (SP.DYN.LE00.IN)
+    url: https://api.worldbank.org/v2/country/all/indicator/SP.DYN.LE00.IN?format=json&per_page=10000
+    paginate: worldbank
+    format: json
+    role: indicator
+    transformer: worldbank_indicator
+    aliases: { XKX: UNK }
+    meta:
+      indicator_id: SP.DYN.LE00.IN
+      indicator_label: Life expectancy at birth, total (years)
+      unit: years
+
+  - id: worldbank_urban
+    name: World Bank — población urbana (SP.URB.TOTL.IN.ZS)
+    url: https://api.worldbank.org/v2/country/all/indicator/SP.URB.TOTL.IN.ZS?format=json&per_page=10000
+    paginate: worldbank
+    format: json
+    role: indicator
+    transformer: worldbank_indicator
+    aliases: { XKX: UNK }
+    meta:
+      indicator_id: SP.URB.TOTL.IN.ZS
+      indicator_label: Urban population (% of total population)
+      unit: percent
+
+  - id: worldbank_fertility
+    name: World Bank — tasa de fecundidad (SP.DYN.TFRT.IN)
+    url: https://api.worldbank.org/v2/country/all/indicator/SP.DYN.TFRT.IN?format=json&per_page=10000
+    paginate: worldbank
+    format: json
+    role: indicator
+    transformer: worldbank_indicator
+    aliases: { XKX: UNK }
+    meta:
+      indicator_id: SP.DYN.TFRT.IN
+      indicator_label: Fertility rate, total (births per woman)
+      unit: births per woman
+
+  - id: worldbank_unemployment
+    name: World Bank — desempleo (SL.UEM.TOTL.ZS)
+    url: https://api.worldbank.org/v2/country/all/indicator/SL.UEM.TOTL.ZS?format=json&per_page=10000
+    paginate: worldbank
+    format: json
+    role: indicator
+    transformer: worldbank_indicator
+    aliases: { XKX: UNK }
+    meta:
+      indicator_id: SL.UEM.TOTL.ZS
+      indicator_label: Unemployment, total (% of total labor force, modeled ILO estimate)
+      unit: percent
+
+  # ---- Eurostat: todas las entidades y toda la serie en una petición
+  - id: eurostat_pop
+    name: Eurostat — población a 1 de enero (demo_pjan)
+    url: https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/demo_pjan?format=JSON&lang=en&sex=T&age=TOTAL
+    format: json
+    role: indicator
+    transformer: eurostat_demo_pjan
+    aliases: { EL: GR, UK: GB }
+    meta:
+      indicator_id: demo_pjan
+      indicator_label: Population on 1 January
+      unit: persons
+
+  # ---- Our World in Data: serie completa
+  - id: owid_life_expectancy
+    name: Our World in Data — life expectancy (CSV)
+    url: https://ourworldindata.org/grapher/life-expectancy.csv?v=1&csvType=full&useColumnShortNames=false
+    format: csv
+    role: indicator
+    transformer: owid_life_expectancy
+    aliases: { OWID_KOS: UNK }
+    meta:
+      indicator_id: life_expectancy
+      indicator_label: Life expectancy
+      unit: years

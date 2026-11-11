@@ -20,11 +20,63 @@ def _read_table(conn: sqlite3.Connection, name: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def _latest_values(inds: pd.DataFrame) -> pd.DataFrame:
+    """Último año con dato de cada indicador del país."""
+    con_valor = inds[inds["value"].notna()]
+    if con_valor.empty:
+        return con_valor
+    idx = con_valor.groupby(["source_id", "indicator_id"])["year"].idxmax()
+    return con_valor.loc[idx].sort_values(["indicator_id", "source_id"])
+
+
+def _comparative_lines(c: pd.Series, inds: pd.DataFrame, countries: pd.DataFrame,
+                       indicators: pd.DataFrame) -> list[str]:
+    """Mediana de la región, mismo indicador y mismo año, frente al valor del país.
+
+    El año de referencia es el último en el que la región tiene datos de ese
+    indicador. Si el país no tiene valor en ese año, la ficha lo dice.
+    """
+    region = c.get("region")
+    peers = countries[countries["region"] == region]["iso3"]
+    lines = []
+    for (source_id, ind_id), own_rows in inds.groupby(["source_id", "indicator_id"]):
+        regional = indicators[
+            indicators["iso3"].isin(peers)
+            & (indicators["indicator_id"] == ind_id)
+            & (indicators["source_id"] == source_id)
+            & indicators["value"].notna()
+        ]
+        if regional.empty:
+            continue
+        year = int(regional["year"].max())
+        same_year = regional[regional["year"] == year]["value"].astype(float)
+        median_v = same_year.median()
+        own = own_rows[(own_rows["year"] == year) & own_rows["value"].notna()]
+        label = own_rows.iloc[0]["indicator_label"]
+        label = label if pd.notna(label) and label else ind_id
+        head = (
+            f"- **{label}** ({year}): mediana de **{region}** = {median_v:,.2f} "
+            f"({len(same_year)} países)"
+        )
+        if own.empty:
+            lines.append(f"{head}; este país no tiene dato en {year} (sin dato).")
+            continue
+        own_v = float(own.iloc[0]["value"])
+        if own_v > median_v:
+            pos = "por encima"
+        elif own_v < median_v:
+            pos = "por debajo"
+        else:
+            pos = "igual"
+        lines.append(f"{head}; este país: **{own_v:,.2f}** ({pos} de la mediana).")
+    return lines
+
+
 def _card_markdown(iso3: str, countries: pd.DataFrame, languages: pd.DataFrame,
                    indicators: pd.DataFrame) -> str:
     c = countries[countries["iso3"] == iso3].iloc[0]
-    langs = languages[languages["iso3"] == iso3]
-    inds = indicators[indicators["iso3"] == iso3]
+    langs = languages[languages["iso3"] == iso3] if "iso3" in languages else languages
+    inds = indicators[indicators["iso3"] == iso3] if "iso3" in indicators else indicators
 
     lang_lines = (
         "\n".join(
@@ -32,34 +84,21 @@ def _card_markdown(iso3: str, countries: pd.DataFrame, languages: pd.DataFrame,
         )
         or "- (sin idiomas en clean/)"
     )
+    latest = _latest_values(inds) if not inds.empty else inds
     ind_lines = (
         "\n".join(
             f"- **{r.indicator_label}** ({r.year}): {r.value} {r.unit or ''} "
             f"_(fuente: {r.source_id})_"
-            for _, r in inds.iterrows()
+            for _, r in latest.iterrows()
         )
         or "- (sin indicadores; posible huérfano del join)"
     )
 
-    # Comparativo simple: media regional del primer indicador disponible
     comparative = "_Sin indicadores para comparar._"
     if not inds.empty and "region" in countries.columns:
-        ind_id = inds.iloc[0]["indicator_id"]
-        region = c["region"]
-        peers = countries[countries["region"] == region]["iso3"]
-        peer_vals = indicators[
-            (indicators["iso3"].isin(peers))
-            & (indicators["indicator_id"] == ind_id)
-            & indicators["value"].notna()
-        ]["value"]
-        if not peer_vals.empty:
-            mean_v = peer_vals.astype(float).mean()
-            own = float(inds.iloc[0]["value"])
-            comparative = (
-                f"Respecto a la media de **{region}** en `{ind_id}` "
-                f"({mean_v:,.2f}): este país está en **{own:,.2f}** "
-                f"({'por encima' if own > mean_v else 'por debajo o igual'})."
-            )
+        lines = _comparative_lines(c, inds, countries, indicators)
+        if lines:
+            comparative = "\n".join(lines)
 
     return f"""# Ficha país — {c['name_common']} ({iso3})
 
@@ -71,11 +110,11 @@ def _card_markdown(iso3: str, countries: pd.DataFrame, languages: pd.DataFrame,
 
 {lang_lines}
 
-## Indicadores
+## Indicadores (último año con dato)
 
 {ind_lines}
 
-## Comparativo
+## Comparativo (mediana regional, mismo año)
 
 {comparative}
 

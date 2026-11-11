@@ -1,4 +1,8 @@
-"""Load: data/clean/ → data/serving/observatorio.sqlite (+ opcional Parquet)."""
+"""Load: data/clean/ → data/serving/observatorio.sqlite (+ copia opcional en Parquet).
+
+El SQLite se regenera desde cero en cada ejecución leyendo la zona limpia.
+El Parquet de referencia es el de data/clean/ (lo escribe siempre el transform).
+"""
 
 from __future__ import annotations
 
@@ -10,7 +14,7 @@ import pandas as pd
 from .core.paths import CLEAN, SERVING, ensure_dirs
 
 DB_PATH = SERVING / "observatorio.sqlite"
-TABLES = ("countries", "languages", "indicators", "join_orphans")
+TABLES = ("countries", "languages", "indicators", "join_orphans", "excluded_entities")
 
 
 def run_load(write_parquet: bool = False) -> Path:
