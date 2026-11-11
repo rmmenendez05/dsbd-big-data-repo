@@ -1,4 +1,5 @@
 requests>=2.31
-pandas>=2.0
+pandas>=2.0,<3
 PyYAML>=6.0
 pyarrow>=14.0
+pyspark>=4.2,<4.3

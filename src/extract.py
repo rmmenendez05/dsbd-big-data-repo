@@ -65,8 +65,31 @@ def _throttle(http: HttpConfig) -> None:
     _last_request_at = time.monotonic()
 
 
-def _get(url: str, http: HttpConfig) -> tuple[int, bytes | None, int, str]:
-    """GET con reintentos. Devuelve (status, contenido si 200, intentos, nota)."""
+def _body_ok(content: bytes, fmt: str | None) -> bool:
+    """Un 200 solo es dato si el cuerpo se puede leer en el formato declarado.
+
+    Algunas APIs (Eurostat) responden 200 con una página HTML de error
+    («Server temporarily unavailable»): eso no es un dato.
+    """
+    if not content:
+        return False
+    head = content[:200].lstrip().lower()
+    if fmt in ("json", "csv") and (head.startswith(b"<!doctype") or head.startswith(b"<html")):
+        return False
+    if fmt == "json":
+        try:
+            json.loads(content)
+        except (ValueError, UnicodeDecodeError):
+            return False
+    return True
+
+
+def _get(url: str, http: HttpConfig, fmt: str | None = None) -> tuple[int, bytes | None, int, str]:
+    """GET con reintentos. Devuelve (status, contenido si 200 válido, intentos, nota).
+
+    Con fmt, un 200 cuyo cuerpo no es de ese formato se trata como error
+    transitorio: se reintenta y, si sigue igual, no se devuelve como dato.
+    """
     headers = {"User-Agent": http.user_agent}
     attempt = 0
     while True:
@@ -80,13 +103,22 @@ def _get(url: str, http: HttpConfig) -> tuple[int, bytes | None, int, str]:
             note = f"error de red: {exc}"
         else:
             status = resp.status_code
-            if status == 200:
+            if status == 200 and (fmt is None or _body_ok(resp.content, fmt)):
                 return status, resp.content, attempt, ""
-            if status == 404 or status in NO_RETRY_STATUS or status not in RETRY_STATUS:
+            if status == 200:
+                if attempt > http.max_retries:
+                    return status, None, attempt, (
+                        f"HTTP 200 pero el cuerpo no es {fmt} válido tras {attempt} intentos "
+                        "(p. ej. página HTML de error); no se guarda"
+                    )
+                note = f"HTTP 200 con cuerpo que no es {fmt}"
+                print(f"    {note}")
+            elif status == 404 or status in NO_RETRY_STATUS or status not in RETRY_STATUS:
                 return status, None, attempt, f"HTTP {status} definitivo, no se reintenta"
-            if attempt > http.max_retries:
+            elif attempt > http.max_retries:
                 return status, None, attempt, f"HTTP {status} tras {attempt} intentos"
-            note = f"HTTP {status}"
+            else:
+                note = f"HTTP {status}"
         delay = http.backoff_seconds * (2 ** (attempt - 1))
         print(f"    reintento {attempt}/{http.max_retries} en {delay:.1f}s ({note})")
         time.sleep(delay)
@@ -122,12 +154,14 @@ def _is_valid(path: Path, fmt: str) -> bool:
     """Un artefacto de raw es válido si existe, no está vacío y se puede leer."""
     if not path.is_file() or path.stat().st_size == 0:
         return False
-    if fmt == "json":
-        try:
-            json.loads(path.read_text(encoding="utf-8"))
-        except (ValueError, UnicodeDecodeError):
-            return False
-    return True
+    return _body_ok(path.read_bytes(), fmt)
+
+
+def _drop_invalid(dest: Path, fmt: str) -> None:
+    """Borra un artefacto inválido de raw (p. ej. un HTML de error de otra ejecución)."""
+    if dest.is_file() and not _is_valid(dest, fmt):
+        print(f"    se borra {dest.name}: no era un {fmt} válido")
+        dest.unlink()
 
 
 def _wb_page_meta(content: bytes) -> tuple[dict, list]:
@@ -203,15 +237,17 @@ def _extract_one(
                     note="omitido: artefacto ya válido en raw (usad --force para repetir)")
     print(f"  {iso2 or '-'}: {url}")
     try:
-        status, content, attempts, note = _get(url, http)
+        status, content, attempts, note = _get(url, http, source.format)
     except requests.RequestException as exc:
+        _drop_invalid(dest, source.format)
         return _row(run_id, source, url, **base, http_status=0, bytes=0,
                     attempts=http.max_retries + 1, note=str(exc))
     if status == 200 and content is not None:
         dest.write_bytes(content)
         return _row(run_id, source, url, **base, http_status=status,
                     bytes=len(content), attempts=attempts, note=note)
-    # Lo que no es 200 no se guarda como dato
+    # Lo que no es un 200 válido no se guarda como dato
+    _drop_invalid(dest, source.format)
     return _row(run_id, source, url, **base, http_status=status, bytes=0,
                 attempts=attempts, note=note)
 
@@ -242,7 +278,7 @@ def _extract_paginated(
         dest = RAW / _page_name(source, page)
         print(f"  página {page}/{pages}: {page_url}")
         try:
-            status, content, attempts, note = _get(page_url, http)
+            status, content, attempts, note = _get(page_url, http, source.format)
         except requests.RequestException as exc:
             manifest.append(_row(run_id, source, page_url, filename=dest.name, http_status=0,
                                  bytes=0, attempts=http.max_retries + 1, note=str(exc)))

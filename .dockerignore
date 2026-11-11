@@ -1,0 +1,14 @@
+# Lo que no hace falta dentro de la imagen (el repo se monta como volumen)
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/
+logs/
+cards/
+evidencias/
+practicas/
+informe/

@@ -1,0 +1,17 @@
+# Ejecuta el pipeline y el job de Spark en el contenedor, sobre el repo local.
+#
+#   docker compose build
+#   docker compose run --rm etl python -m src.pipeline
+#   docker compose run --rm etl python -m src.pipeline      # 2.ª vez: sin re-descargas
+#   docker compose run --rm --service-ports etl python spark/job_01.py
+#   docker compose run --rm etl python -m pytest tests
+services:
+  etl:
+    build: .
+    image: observatorio-etl
+    working_dir: /app
+    volumes:
+      # El repo se monta en /app: data/, logs/ y cards/ se escriben en el disco local
+      - .:/app
+    ports:
+      - "4040:4040"   # Spark UI (solo con --service-ports, mientras corre el job)

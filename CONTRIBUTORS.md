@@ -1,5 +1,5 @@
-# Contributors
+# Equipo observatorio - Practica 2
 
-| Nombre y apellidos | Email institucional (UCJC) | Email personal | Usuarios en el historial de Git |
-| --- | --- | --- | --- |
-| Rodrigo Moreno Menéndez | rodrigo.morenom@alumno.ucjc.edu | rmmenendez05@gmail.com | rmmenendez05, tutifrutihd |
+Rodrigo Moreno Menéndez - rodrigo.morenom@alumno.ucjc.edu
+
+Usuarios de Git con los que aparece en el historial: rmmenendez05, tutifrutihd.
