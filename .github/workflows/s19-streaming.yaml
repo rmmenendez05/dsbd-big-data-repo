@@ -1,0 +1,145 @@
+# CI · Sesión 19: query continuo temp-stream (Spark Structured Streaming).
+#
+# codigo   tests/s19 salvo el acta: comprobación estática de T1 a T6.
+# acta     test_acta_s19 aparte, para que no bloquee el ensayo mientras
+#          ACTA_S19.md no existe (sus logs sirven para escribirla).
+# ensayo   parar y arrancar de verdad contra un Kafka de pruebas, con
+#          los scripts de streaming/ (ver .github/scripts/s19_ensayo.sh).
+#
+# El ensayo usa Spark 3.5 (el del contrato de aula y del conector
+# spark-sql-kafka-0-10_2.12), no el pyspark 4.2 de requirements.txt.
+name: S19 · streaming
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "streaming/**"
+      - "tests/s19/**"
+      - "tests/conftest.py"
+      - "ACTA_S19.md"
+      - ".github/scripts/s19_ensayo.sh"
+      - ".github/workflows/s19-streaming.yaml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "streaming/**"
+      - "tests/s19/**"
+      - "tests/conftest.py"
+      - "ACTA_S19.md"
+      - ".github/scripts/s19_ensayo.sh"
+      - ".github/workflows/s19-streaming.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s19-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codigo:
+    name: tests/s19 (código)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar pytest
+        # Los tests de S19 son estáticos (ast): no importan Spark
+        run: pip install pytest pyyaml
+
+      - name: Tests de temp_stream.py (T1 a T6)
+        run: python -m pytest tests/s19 -v --tb=short -k "not acta"
+
+  acta:
+    name: tests/s19 (ACTA_S19.md)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pytest pyyaml
+
+      - name: Test del acta
+        run: python -m pytest tests/s19 -v --tb=short -k acta
+
+  ensayo:
+    name: Ensayo parar y arrancar
+    needs: codigo
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      kafka:
+        image: apache/kafka:3.9.0   # KRaft, un nodo, escucha en localhost:9092
+        ports:
+          - 9092:9092
+        options: >-
+          --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
+          --health-interval 5s
+          --health-timeout 15s
+          --health-retries 24
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Java 17 para Spark
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Instalar PySpark 3.5
+        run: |
+          pip install "pyspark==3.5.*"
+          v=$(python -c "import pyspark; print(pyspark.__version__)")
+          echo "SPARK_VERSION=$v" >> "$GITHUB_ENV"
+          echo "PACKAGES=org.apache.spark:spark-sql-kafka-0-10_2.12:$v" >> "$GITHUB_ENV"
+
+      - name: Caché del conector Kafka (Ivy)
+        uses: actions/cache@v4
+        with:
+          path: ~/.ivy2
+          key: ivy-spark-sql-kafka-${{ env.SPARK_VERSION }}
+
+      - name: Topic sensores.temp y kafka-console-producer.sh en el PATH
+        env:
+          KAFKA_ID: ${{ job.services.kafka.id }}
+        run: |
+          docker exec "$KAFKA_ID" /opt/kafka/bin/kafka-topics.sh \
+            --bootstrap-server localhost:9092 --create --if-not-exists \
+            --topic sensores.temp --partitions 1 --replication-factor 1
+          # Los scripts de streaming/ llaman a kafka-console-producer.sh,
+          # que vive dentro del contenedor de Kafka
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/kafka-console-producer.sh" <<EOF
+          #!/usr/bin/env bash
+          exec docker exec -i "$KAFKA_ID" /opt/kafka/bin/kafka-console-producer.sh "\$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/kafka-console-producer.sh"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Ensayo (primer día, parada, eventos, rearranque, trampas, sin checkpoint)
+        env:
+          OUT: ensayo
+        run: bash .github/scripts/s19_ensayo.sh
+
+      - name: Guardar logs y checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ensayo-s19
+          path: ensayo/
+          retention-days: 30
