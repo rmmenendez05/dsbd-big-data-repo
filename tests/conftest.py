@@ -46,6 +46,10 @@ def pytest_configure(config):
         "markers",
         "runtime: ejecuta el código actual del ETL (práctica 1) sin red",
     )
+    config.addinivalue_line(
+        "markers",
+        "s19: comprobaciones de la sesión 19 (streaming temp-stream)",
+    )
 
 
 def _es_raiz_etl(path: Path) -> bool:
