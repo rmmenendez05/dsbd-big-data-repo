@@ -69,7 +69,7 @@ id_de() {  # $1 = query, $2 = log
 }
 
 # Filas de la consola: temp-nulos = |sensor|valor|ts|, temp-stream = |window|sensor|count|
-FILA_NULO_S09='\|s09 *\|null *\|'
+FILA_NULO_S09='\|s09 *\|(null|NULL) *\|'   # Spark 3.5 escribe NULL
 FILA_CONTEO() { echo "\\}\\|$1 *\\|[0-9]+ *\\|"; }
 
 # ── 1. Primer día ─────────────────────────────────────────────────────────

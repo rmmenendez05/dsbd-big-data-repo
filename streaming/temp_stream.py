@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import signal
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, from_json, window
@@ -131,6 +132,10 @@ def main() -> None:
 
     spark = SparkSession.builder.appName(QUERY_NAME).getOrCreate()
     spark.sparkContext.setLogLevel("WARN")
+    # PySpark instala su propio manejador de Ctrl+C, que llama a la JVM
+    # mientras awaitAnyTermination() espera respuesta y acaba en Py4JError.
+    # Con el de Python, Ctrl+C llega como KeyboardInterrupt y se para limpio.
+    signal.signal(signal.SIGINT, signal.default_int_handler)
 
     ev = parsear(construir_fuente(spark, args.starting_offsets))
     q = arrancar(agregar(ev), args.checkpoint)
