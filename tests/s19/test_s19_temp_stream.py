@@ -19,15 +19,30 @@ pytestmark = pytest.mark.s19
 RUTA = Path("streaming") / "temp_stream.py"
 
 
-def _fichero(repo_root: Path, git_root: Path) -> Path:
+FALTA = (
+    "Falta streaming/temp_stream.py. Copiad el starter de "
+    "cesar-andress/bigdata2026 (streaming/temp_stream.py) a vuestro "
+    "repositorio y resolved los huecos T1 a T6."
+)
+
+
+def _buscar(repo_root: Path, git_root: Path) -> Path | None:
     for base in (repo_root, git_root):
         if (base / RUTA).is_file():
             return base / RUTA
-    pytest.fail(
-        "Falta streaming/temp_stream.py. Copiad el starter de "
-        "cesar-andress/bigdata2026 (streaming/temp_stream.py) a vuestro "
-        "repositorio y resolved los huecos T1 a T6."
-    )
+    return None
+
+
+def test_existe_temp_stream(repo_root: Path, git_root: Path):
+    if _buscar(repo_root, git_root) is None:
+        pytest.fail(FALTA)
+
+
+def _fichero(repo_root: Path, git_root: Path) -> Path:
+    path = _buscar(repo_root, git_root)
+    if path is not None:
+        return path
+    pytest.skip("sin streaming/temp_stream.py (ver test_existe_temp_stream)")
 
 
 @pytest.fixture(scope="module")

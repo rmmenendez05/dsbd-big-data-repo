@@ -1,0 +1,20 @@
+# Casos de aula · sesión 20 (23/11/2026)
+# Hechos del enunciado. No son umbrales universales.
+
+informe_ocho:
+  nombre: Informe diario de ocupación (consulta 08:00)
+  aulas: 12
+  volumen: "~180 eventos/hora en día lectivo"
+  consulta: "una vez al día, 08:00"
+  frescura: "horas; se admiten datos de la noche anterior"
+  ventana_batch: "02:00–06:00"
+  propuesta_recibida: "Kafka + Spark Structured Streaming 24/7"
+  conclusion_esperada: batch
+
+alerta_aforo:
+  nombre: Alerta de aforo (reacción)
+  dominio: "mismas aulas / mismos eventos"
+  latencia_util: "< 2 minutos"
+  frescura: "minutos"
+  consumidor_continuo: true
+  conclusion_esperada: streaming

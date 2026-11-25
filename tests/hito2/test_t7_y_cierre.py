@@ -1,4 +1,4 @@
-"""Hito 2 · Piezas B y C, etiqueta entrega-02 y lo que no debe subirse."""
+"""Hito 2: Piezas B y C, etiqueta entrega-02 y lo que no debe subirse."""
 
 from __future__ import annotations
 

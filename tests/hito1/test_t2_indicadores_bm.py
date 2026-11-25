@@ -1,4 +1,4 @@
-"""T2 · Al menos seis indicadores del Banco Mundial (dos fijos)."""
+"""T2: Al menos seis indicadores del Banco Mundial (dos fijos)."""
 
 from __future__ import annotations
 

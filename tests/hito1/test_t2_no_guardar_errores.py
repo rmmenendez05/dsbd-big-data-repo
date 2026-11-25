@@ -1,4 +1,4 @@
-"""T2 · Solo HTTP 200 se materializa en data/raw/ como dato."""
+"""T2: Solo HTTP 200 se materializa en data/raw/ como dato."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def test_respuesta_no_200_no_escribe_raw(repo_root: Path, monkeypatch, tmp_path)
         # Importación diferida: el alumno puede reorganizar módulos.
         extract = importlib.import_module("src.extract")
         paths = importlib.import_module("src.paths")
-    except Exception as exc:  # noqa: BLE001 — mensaje pedagógico
+    except Exception as exc:  # noqa: BLE001: mensaje pedagógico
         pytest.fail(f"No se pudo importar src.extract/src.paths: {exc}")
 
     raw_dir = tmp_path / "raw"

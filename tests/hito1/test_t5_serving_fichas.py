@@ -1,4 +1,4 @@
-"""T5 · SQLite regenerado desde clean y fichas con mediana regional del mismo año."""
+"""T5: SQLite regenerado desde clean y fichas con mediana regional del mismo año."""
 
 from __future__ import annotations
 

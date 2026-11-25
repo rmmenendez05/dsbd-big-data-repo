@@ -1,4 +1,4 @@
-"""T2 · Paginación completa frente a metadatos del Banco Mundial."""
+"""T2: Paginación completa frente a metadatos del Banco Mundial."""
 
 from __future__ import annotations
 

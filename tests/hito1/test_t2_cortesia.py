@@ -1,4 +1,4 @@
-"""T2 · Cortesía: ritmo ≤ 5 pet/s y User-Agent del equipo."""
+"""T2: Cortesía: ritmo ≤ 5 pet/s y User-Agent del equipo."""
 
 from __future__ import annotations
 

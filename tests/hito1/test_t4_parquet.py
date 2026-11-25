@@ -1,4 +1,4 @@
-"""T4 · Parquet particionado estilo Hive por indicator_id."""
+"""T4: Parquet particionado estilo Hive por indicator_id."""
 
 from __future__ import annotations
 

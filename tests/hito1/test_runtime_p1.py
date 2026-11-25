@@ -38,7 +38,7 @@ _MODULOS = (
 def etl(repo_root: Path):
     try:
         return import_src(repo_root)
-    except Exception as exc:  # noqa: BLE001 — el fallo debe explicar el módulo
+    except Exception as exc:  # noqa: BLE001: el fallo debe explicar el módulo
         pytest.fail(f"No se pudo importar el paquete src del repo: {exc}")
 
 
@@ -467,7 +467,7 @@ def test_load_crea_sqlite_y_omite_tablas_ausentes(caja):
 
 
 def test_load_y_fichas_desde_clean(caja, monkeypatch):
-    """Clean → SQLite → una ficha por país, leyendo solo serving."""
+    """De clean a SQLite y una ficha por país, leyendo solo serving."""
     etl, dirs = caja
     _exigir_pipeline_starter(etl)
     (dirs["RAW"] / "countries_profile.json").write_text(json.dumps(_perfil()), encoding="utf-8")

@@ -1,4 +1,4 @@
-"""T1 · Universo de países (lo que el Hito 1 ya tiene que dejar escrito)."""
+"""T1: Universo de países (lo que el Hito 1 ya tiene que dejar escrito)."""
 
 from __future__ import annotations
 

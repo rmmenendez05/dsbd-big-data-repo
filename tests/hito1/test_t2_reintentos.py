@@ -1,4 +1,4 @@
-"""T2 · Reintentos con espera creciente ante errores transitorios."""
+"""T2: Reintentos con espera creciente ante errores transitorios."""
 
 from __future__ import annotations
 

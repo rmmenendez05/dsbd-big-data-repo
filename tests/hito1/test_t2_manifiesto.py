@@ -1,4 +1,4 @@
-"""T2 · Manifiesto acumulativo con run_id."""
+"""T2: Manifiesto acumulativo con run_id."""
 
 from __future__ import annotations
 

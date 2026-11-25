@@ -1,4 +1,4 @@
-"""Hito 1 · CONTRIBUTORS.md con identidad institucional."""
+"""Hito 1: CONTRIBUTORS.md con identidad institucional."""
 
 from __future__ import annotations
 

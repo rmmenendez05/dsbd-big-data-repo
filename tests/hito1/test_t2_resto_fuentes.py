@@ -1,4 +1,4 @@
-"""T2 · El resto de fuentes también pasa a universo y serie completa."""
+"""T2: El resto de fuentes también pasa a universo y serie completa."""
 
 from __future__ import annotations
 

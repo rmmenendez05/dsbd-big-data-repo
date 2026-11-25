@@ -1,4 +1,4 @@
-"""T6 · spark/job_01.py: RDD, DataFrame, Spark SQL y SQLite.
+"""T6: spark/job_01.py: RDD, DataFrame, Spark SQL y SQLite.
 
 El Hito 2 pide un solo programa, ``spark/job_01.py``, que lee el Parquet
 de indicators, calcula la cobertura por indicador y década de tres maneras

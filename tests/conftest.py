@@ -44,11 +44,15 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "runtime: ejecuta el código actual del ETL (práctica 1) sin red",
+        "s19: sesión 19 (18/11): query temp-stream y ACTA_S19.md",
     )
     config.addinivalue_line(
         "markers",
-        "s19: comprobaciones de la sesión 19 (streaming temp-stream)",
+        "s20: sesión 20 (23/11): DECISION_S20.md criterio batch vs streaming",
+    )
+    config.addinivalue_line(
+        "markers",
+        "runtime: ejecuta el código actual del ETL (práctica 1) sin red",
     )
 
 
@@ -58,18 +62,18 @@ def _es_raiz_etl(path: Path) -> bool:
 
 def _resolver_raiz(raw: Path) -> Path:
     raw = raw.resolve()
+    if not raw.is_dir():
+        pytest.fail(f"--repo no es un directorio: {raw}")
     if _es_raiz_etl(raw):
         return raw
-    if raw.is_dir():
-        anidados = sorted(
-            p for p in raw.iterdir() if p.is_dir() and _es_raiz_etl(p)
-        )
-        if len(anidados) == 1:
-            return anidados[0]
-    pytest.fail(
-        f"No hay un ETL en {raw} (hace falta sources.yaml y src/). "
-        "Si el código está en un subdirectorio, dejad solo uno o pasad esa ruta."
+    anidados = sorted(
+        p for p in raw.iterdir() if p.is_dir() and _es_raiz_etl(p)
     )
+    if len(anidados) == 1:
+        return anidados[0]
+    # Encargos de sesión (ACTA_S19, DECISION_S20, …) pueden vivir en un clon
+    # sin layout ETL; los tests de hito seguirán fallando si falta sources.yaml.
+    return raw
 
 
 def _raiz_por_defecto() -> Path:

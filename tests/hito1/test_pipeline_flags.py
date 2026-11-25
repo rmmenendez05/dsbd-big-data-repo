@@ -1,4 +1,4 @@
-"""Hito 1 · La segunda ejecución del pipeline no vuelve a descargar."""
+"""Hito 1: La segunda ejecución del pipeline no vuelve a descargar."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""T3 · Esquema común, clave única y huérfanos por fuente."""
+"""T3: Esquema común, clave única y huérfanos por fuente."""
 
 from __future__ import annotations
 

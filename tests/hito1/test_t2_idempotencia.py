@@ -1,4 +1,4 @@
-"""T2 · Idempotencia del extract (sin --force no se re-descarga)."""
+"""T2: Idempotencia del extract (sin --force no se re-descarga)."""
 
 from __future__ import annotations
 
